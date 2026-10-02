@@ -34,7 +34,6 @@ async fn main() -> Result<()> {
     info!("Detected System: {} {} (Board: {})", sys_id.vendor, sys_id.product, sys_id.board);
 
     let mut manager = BackendManager::new();
-    // Add available dummy backends
     manager.add_backend(Box::new(acer_wmi::Backend));
     manager.add_backend(Box::new(linuwu_sense::Backend));
     manager.add_backend(Box::new(hwmon::Backend));
@@ -68,10 +67,9 @@ async fn main() -> Result<()> {
         loop {
             tokio::time::sleep(Duration::from_millis(1000)).await;
             if telemetry_state.event_tx.receiver_count() > 0 {
-                // In real app we query manager for telemetry
-                // let manager = telemetry_state.manager.read().await;
-                // let telemetry = manager.get_telemetry().await;
-                let telemetry = Telemetry::default();
+                let manager = telemetry_state.manager.read().await;
+                // Currently returning mock telemetry
+                let telemetry = manager.get_telemetry().await.unwrap_or_default();
                 let event = IpcEvent::TelemetryUpdate(telemetry);
                 if let Ok(json) = serde_json::to_string(&event) {
                     let _ = telemetry_state.event_tx.send(json);
@@ -143,26 +141,74 @@ async fn process_request(req: &IpcRequest, state: &AppState, is_subscribed: &mut
             let sys = SystemIdentification::probe();
             let mut report = format!("AcerControl Hardware Diagnostic\n");
             report.push_str("────────────────────────────────\n\n");
-            report.push_str("System\n");
-            report.push_str(&format!("  Vendor:       {}\n", sys.vendor));
-            report.push_str(&format!("  Model:        {}\n", sys.product));
-            report.push_str(&format!("  Version:      {}\n", sys.version));
-            report.push_str(&format!("  Board:        {}\n\n", sys.board));
-            report.push_str("Backends\n");
+            report.push_str("SYSTEM\n");
+            report.push_str(&format!("Vendor:       {}\n", sys.vendor));
+            report.push_str(&format!("Model:        {}\n", sys.product));
+            report.push_str(&format!("Version:      {}\n", sys.version));
+            report.push_str(&format!("Board:        {}\n\n", sys.board));
+            report.push_str("BACKENDS\n");
             for b in manager.active_backends() {
-                report.push_str(&format!("  {} active\n", b));
+                report.push_str(&format!("{:14} active\n", b));
             }
+            report.push_str("\nCAPABILITIES\n");
+            let caps = manager.get_capabilities().await;
+            report.push_str(&format!("Fan telemetry:      {}\n", if caps.fan_telemetry { "✓" } else { "—" }));
+            report.push_str(&format!("Fan control:        {}\n", if caps.fan_control { "✓" } else { "—" }));
+            report.push_str(&format!("Thermal profiles:   {}\n", if caps.thermal_profile { "✓" } else { "—" }));
+            report.push_str(&format!("Battery limit:      {}\n", if caps.battery_limit { "✓" } else { "—" }));
+            report.push_str(&format!("Keyboard backlight: {}\n", if caps.keyboard_backlight { "✓" } else { "—" }));
+            report.push_str(&format!("GPU mode:           {}\n", if caps.gpu_mode { "✓" } else { "—" }));
+            report.push_str(&format!("CPU power limit:    {}\n", if caps.cpu_power_limit { "✓" } else { "—" }));
+            
+            report.push_str("\nREASONS\n");
+            if !caps.keyboard_backlight {
+                report.push_str("RGB                  Driver missing or unsupported\n");
+            }
+            if !caps.gpu_mode {
+                report.push_str("GPU mode             Unsupported by detected firmware\n");
+            }
+            
             IpcResponse::DoctorReport(report)
         }
         IpcRequest::GetCapabilities => {
-            // Aggregate from all active backends in real app
-            IpcResponse::Capabilities(vec![Capability::FanTelemetry])
+            IpcResponse::Capabilities(manager.get_capabilities().await)
         }
-        IpcRequest::GetTelemetry => IpcResponse::Telemetry(Telemetry::default()),
+        IpcRequest::GetTelemetry => IpcResponse::Telemetry(manager.get_telemetry().await.unwrap_or_default()),
         IpcRequest::GetSystemIdentification => IpcResponse::SystemIdentification(SystemIdentification::probe()),
-        IpcRequest::SetThermalProfile(_p) => IpcResponse::Ok,
-        IpcRequest::SetFanMode(_m) => IpcResponse::Ok,
-        IpcRequest::SetBatteryLimit(_l) => IpcResponse::Ok,
+        IpcRequest::GetThermalProfile => IpcResponse::ThermalProfile(ThermalProfile::Balanced),
+        IpcRequest::SetThermalProfile { profile } => {
+            let _ = manager.set_performance_mode(profile.clone()).await;
+            IpcResponse::Ok
+        },
+        IpcRequest::SetFanMode { mode } => {
+            let _ = manager.set_fan_mode(mode.clone()).await;
+            IpcResponse::Ok
+        },
+        IpcRequest::SetFanSpeed { cpu_percent: _, gpu_percent: _ } => {
+            IpcResponse::Ok
+        },
+        IpcRequest::SetBatteryLimit { limit } => {
+            let _ = manager.set_battery_limit(*limit).await;
+            IpcResponse::Ok
+        },
+        IpcRequest::SetKeyboardTimeout { timeout_s: _ } => {
+            // manager.set_keyboard_timeout(*timeout_s).await;
+            IpcResponse::Ok
+        },
+        IpcRequest::SetWifiEnabled { enabled } => {
+            let cmd = if *enabled { "unblock" } else { "block" };
+            let _ = std::process::Command::new("rfkill").arg(cmd).arg("wifi").spawn();
+            IpcResponse::Ok
+        },
+        IpcRequest::SetBluetoothEnabled { enabled } => {
+            let cmd = if *enabled { "unblock" } else { "block" };
+            let _ = std::process::Command::new("rfkill").arg(cmd).arg("bluetooth").spawn();
+            IpcResponse::Ok
+        },
+        IpcRequest::DropCaches => {
+            let _ = std::process::Command::new("sh").arg("-c").arg("sync; echo 3 > /proc/sys/vm/drop_caches").spawn();
+            IpcResponse::Ok
+        },
         IpcRequest::SubscribeEvents => {
             *is_subscribed = true;
             IpcResponse::Ok

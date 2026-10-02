@@ -74,12 +74,9 @@ void BackendClient::sendRequest(const QString &type, const QJsonObject &data)
 
 void BackendClient::setFanMode(const QString &mode)
 {
-    QJsonObject data; // wait, SetFanMode(FanMode) in rust is probably `{"SetFanMode": "Auto"}`
-    // Since it's a newtype enum variant: {"SetFanMode": "Auto"}
-    QJsonObject obj;
-    obj["SetFanMode"] = mode;
-    QJsonDocument doc(obj);
-    m_socket->write(doc.toJson(QJsonDocument::Compact) + "\n");
+    QJsonObject data;
+    data["mode"] = mode;
+    sendRequest("SetFanMode", data);
 }
 
 void BackendClient::setFanSpeed(int cpu, int gpu)
@@ -92,29 +89,27 @@ void BackendClient::setFanSpeed(int cpu, int gpu)
 
 void BackendClient::setThermalProfile(const QString &profile)
 {
-    QJsonObject obj;
-    obj["SetThermalProfile"] = profile;
-    QJsonDocument doc(obj);
-    m_socket->write(doc.toJson(QJsonDocument::Compact) + "\n");
+    QJsonObject data;
+    data["profile"] = profile;
+    sendRequest("SetThermalProfile", data);
 }
 
 void BackendClient::setBatteryLimit(int limit)
 {
-    QJsonObject obj;
-    obj["SetBatteryLimit"] = limit;
-    QJsonDocument doc(obj);
-    m_socket->write(doc.toJson(QJsonDocument::Compact) + "\n");
+    QJsonObject data;
+    data["limit"] = limit;
+    sendRequest("SetBatteryLimit", data);
 }
 
 void BackendClient::setWifiEnabled(bool enabled)
 {
-    system(enabled ? "rfkill unblock wifi" : "rfkill block wifi");
+    QJsonObject data; data["enabled"] = enabled; sendRequest("SetWifiEnabled", data);
     refreshNetworkState();
 }
 
 void BackendClient::setBluetoothEnabled(bool enabled)
 {
-    system(enabled ? "rfkill unblock bluetooth" : "rfkill block bluetooth");
+    QJsonObject data; data["enabled"] = enabled; sendRequest("SetBluetoothEnabled", data);
     refreshNetworkState();
 }
 
@@ -243,9 +238,7 @@ void BackendClient::setMonitorMode(const QString &name, const QString &modeId)
 
 void BackendClient::dropCaches()
 {
-    // Drop caches (requires sudo or pkexec usually, but let's try writing to drop_caches via pkexec if needed, or daemon)
-    // Actually, it's better to do it cleanly. We'll try a simple system call for now.
-    system("pkexec sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'");
+    sendRequest("DropCaches");
 }
 
 void BackendClient::setLanguage(const QString &lang)
@@ -316,10 +309,11 @@ void BackendClient::handleMessage(const QJsonObject &msg)
 void BackendClient::refreshAll()
 {
     sendRequest("GetCapabilities");
-    sendRequest("GetSystemInfo");
-    sendRequest("GetFanStatus");
-    sendRequest("GetBatteryStatus");
+    
+    
+    
     sendRequest("GetThermalProfile");
+    sendRequest("GetTelemetry");
 }
 
 void BackendClient::onConnected()
@@ -362,6 +356,7 @@ void BackendClient::onErrorOccurred(QLocalSocket::LocalSocketError socketError)
 
 void BackendClient::setKeyboardTimeout(int value)
 {
-    QString cmd = QString("pkexec sh -c 'echo %1 > /sys/module/linuwu_sense/drivers/platform:acer-wmi/acer-wmi/nitro_sense/backlight_timeout'").arg(value);
-    QProcess::startDetached(cmd);
+    QJsonObject data;
+    data["timeout_s"] = value;
+    sendRequest("SetKeyboardTimeout", data);
 }

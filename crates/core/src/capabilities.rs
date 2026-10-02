@@ -26,3 +26,14 @@ impl CapabilityStatus {
         matches!(self, CapabilityStatus::Supported)
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapabilitiesMap {
+    pub fan_control: bool,
+    pub fan_telemetry: bool,
+    pub thermal_profile: bool,
+    pub battery_limit: bool,
+    pub keyboard_backlight: bool,
+    pub gpu_mode: bool,
+    pub cpu_power_limit: bool,
+}

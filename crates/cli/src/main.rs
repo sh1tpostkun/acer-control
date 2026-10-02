@@ -106,7 +106,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 println!("{:#?}", res);
             }
             FanAction::Auto => {
-                let res = send_request(IpcRequest::SetFanMode(FanMode::Auto), &socket_path).await?;
+                let res = send_request(IpcRequest::SetFanMode { mode: FanMode::Auto }, &socket_path).await?;
                 println!("{:?}", res);
             }
         },
@@ -122,13 +122,13 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                         return Ok(());
                     }
                 };
-                let res = send_request(IpcRequest::SetThermalProfile(p), &socket_path).await?;
+                let res = send_request(IpcRequest::SetThermalProfile { profile: p }, &socket_path).await?;
                 println!("{:?}", res);
             }
         },
         Commands::Battery { action } => match action {
             BatteryAction::Limit { percent } => {
-                let res = send_request(IpcRequest::SetBatteryLimit(percent), &socket_path).await?;
+                let res = send_request(IpcRequest::SetBatteryLimit { limit: percent }, &socket_path).await?;
                 println!("{:?}", res);
             }
         },

@@ -5,7 +5,7 @@ pub struct Backend;
 
 #[async_trait::async_trait]
 impl HardwareBackend for Backend {
-    fn name(&self) -> &'static str { stringify!($f) }
+    fn name(&self) -> &'static str { "linuwu_sense" }
     async fn probe(&self) -> ProbeResult { ProbeResult { available: false, active_capabilities: vec![] } }
     async fn capabilities(&self) -> Vec<Capability> { vec![] }
     async fn telemetry(&self) -> Result<Telemetry> { Ok(Telemetry::default()) }
