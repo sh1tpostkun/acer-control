@@ -42,6 +42,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     manager.add_backend(Box::new(nvml::Backend::new()));
     manager.add_backend(Box::new(linuwu_sense::Backend::new()));
     manager.add_backend(Box::new(hwmon::Backend::new()));
+    manager.add_backend(Box::new(acercontrol_backends::os_stats::Backend::new()));
     manager.add_backend(Box::new(acer_wmi::Backend));
     manager.add_backend(Box::new(sysfs::Backend));
 

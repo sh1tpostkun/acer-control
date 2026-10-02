@@ -41,6 +41,8 @@ pub struct SystemTelemetry {
     pub vram_total_gb: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gpu_name: Option<String>,
+    pub disk_used_gb: Option<f32>,
+    pub disk_total_gb: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]

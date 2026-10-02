@@ -337,8 +337,20 @@ Item {
                     spacing: 16
                     Repeater {
                         model: [
-                            { name: "CPU FAN", rpm: (backend.fanStatus && backend.fanStatus.cpu_rpm !== undefined) ? backend.fanStatus.cpu_rpm : 0, mode: backend.fanStatus ? backend.fanStatus.mode :qsTr("Auto"), maxRpm: 6000 },
-                            { name: "GPU FAN", rpm: (backend.fanStatus && backend.fanStatus.gpu_rpm !== undefined) ? backend.fanStatus.gpu_rpm : 0, mode: backend.fanStatus ? backend.fanStatus.mode :qsTr("Auto"), maxRpm: 6000 },
+                            { 
+                                name: "CPU FAN", 
+                                val: (backend.fanStatus && backend.fanStatus.cpu_rpm !== undefined) ? backend.fanStatus.cpu_rpm : ((backend.fanStatus && backend.fanStatus.cpu_percent !== undefined) ? backend.fanStatus.cpu_percent : 0),
+                                isRpm: (backend.fanStatus && backend.fanStatus.cpu_rpm !== undefined),
+                                mode: backend.fanStatus && backend.fanStatus.mode ? backend.fanStatus.mode : qsTr("Auto"), 
+                                maxVal: (backend.fanStatus && backend.fanStatus.cpu_rpm !== undefined) ? 6000 : 100 
+                            },
+                            { 
+                                name: "GPU FAN", 
+                                val: (backend.fanStatus && backend.fanStatus.gpu_rpm !== undefined) ? backend.fanStatus.gpu_rpm : ((backend.fanStatus && backend.fanStatus.gpu_percent !== undefined) ? backend.fanStatus.gpu_percent : 0),
+                                isRpm: (backend.fanStatus && backend.fanStatus.gpu_rpm !== undefined),
+                                mode: backend.fanStatus && backend.fanStatus.mode ? backend.fanStatus.mode : qsTr("Auto"), 
+                                maxVal: (backend.fanStatus && backend.fanStatus.gpu_rpm !== undefined) ? 6000 : 100 
+                            },
                         ]
                         Rectangle {
                             Layout.fillWidth: true
@@ -353,8 +365,8 @@ Item {
                                 spacing: 4
                                 Label { text: modelData.name; color: textMuted; font.pixelSize: 12 }
                                 RowLayout {
-                                    Label { text: Math.round(modelData.rpm); font.pixelSize: 22; font.bold: true; color: textMain }
-                                    Label { text: "RPM"; font.pixelSize: 12; color: textMuted }
+                                    Label { text: Math.round(modelData.val); font.pixelSize: 22; font.bold: true; color: textMain }
+                                    Label { text: modelData.isRpm ? "RPM" : "%"; font.pixelSize: 12; color: textMuted }
                                 }
                                 Item { Layout.fillHeight: true }
                                 Rectangle {
@@ -363,7 +375,7 @@ Item {
                                     color: bgSecondary
                                     radius: 3
                                     Rectangle {
-                                        width: parent.width * (modelData.rpm / modelData.maxRpm)
+                                        width: parent.width * (modelData.val / modelData.maxVal)
                                         height: parent.height
                                         color: accentBlue
                                         radius: 3

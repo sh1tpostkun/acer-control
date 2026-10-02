@@ -7,6 +7,7 @@ pub mod hwmon;
 pub mod linuwu_sense;
 pub mod nvml;
 pub mod sysfs;
+pub mod os_stats;
 
 #[async_trait::async_trait]
 pub trait HardwareBackend: Send + Sync {
@@ -224,6 +225,12 @@ impl BackendManager {
                     }
                     if agg.system.ram_total_gb.is_none() && tel.system.ram_total_gb.is_some() {
                         agg.system.ram_total_gb = tel.system.ram_total_gb;
+                    }
+                    if agg.system.disk_used_gb.is_none() && tel.system.disk_used_gb.is_some() {
+                        agg.system.disk_used_gb = tel.system.disk_used_gb;
+                    }
+                    if agg.system.disk_total_gb.is_none() && tel.system.disk_total_gb.is_some() {
+                        agg.system.disk_total_gb = tel.system.disk_total_gb;
                     }
                 }
                 Err(e) => {
