@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=AcerControl
+Comment=Native Linux Control Center for Acer Laptops
+Exec=/usr/local/bin/acercontrol-gui
+Icon=acercontrol
+Terminal=false
+Type=Application
+Categories=System;HardwareSettings;Settings;
+Keywords=acer;nitro;fan;control;battery;thermal;
+StartupNotify=true

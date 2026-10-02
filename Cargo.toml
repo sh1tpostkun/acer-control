@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "crates/core",
+    "crates/daemon",
+    "crates/hardware",
+    "crates/ipc",
+    "crates/monitoring",
+    "crates/config",
+    "crates/cli",
+]
+resolver = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1

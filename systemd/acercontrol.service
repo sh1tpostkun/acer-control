@@ -1,0 +1,20 @@
+[Unit]
+Description=AcerControl Hardware Management Daemon
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/acercontrol-daemon
+Restart=on-failure
+RestartSec=5
+User=root
+Group=root
+
+# Security & Environment
+NoNewPrivileges=no
+
+# Allow access to hardware sysfs and WMI
+ReadWritePaths=/sys/class/hwmon /sys/firmware/acpi /sys/class/power_supply /sys/bus/wmi
+
+[Install]
+WantedBy=multi-user.target
