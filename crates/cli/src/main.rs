@@ -58,6 +58,7 @@ enum ProfileAction {
 
 #[derive(Subcommand, Debug)]
 enum BatteryAction {
+    #[command(about = "Set battery charge limit (80 for on, 100 for off)")]
     Limit { percent: u8 },
 }
 

@@ -357,7 +357,9 @@ impl BackendManager {
                 }
             }
         }
-        Ok(ThermalProfile::Balanced)
+        Err(ErrorInfo::not_supported(
+            "No active backend successfully provided the current thermal profile on this hardware",
+        ))
     }
 }
 

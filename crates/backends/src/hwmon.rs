@@ -195,8 +195,8 @@ impl HardwareBackend for Backend {
     async fn probe(&self) -> ProbeResult {
         let mut details = vec![];
 
-        let (cpu_rpm, _, fan_source) = Self::find_fans();
-        if cpu_rpm.is_some() || fan_source.is_some() {
+        let (cpu_rpm, gpu_rpm, fan_source) = Self::find_fans();
+        if cpu_rpm.is_some() || gpu_rpm.is_some() || fan_source.is_some() {
             details.push(CapabilityDetail::new(
                 Capability::FanTelemetry,
                 fan_source,
@@ -215,8 +215,8 @@ impl HardwareBackend for Backend {
     }
 
     async fn capabilities(&self) -> Vec<Capability> {
-        let (cpu_rpm, _, fan_source) = Self::find_fans();
-        if cpu_rpm.is_some() || fan_source.is_some() {
+        let (cpu_rpm, gpu_rpm, fan_source) = Self::find_fans();
+        if cpu_rpm.is_some() || gpu_rpm.is_some() || fan_source.is_some() {
             vec![Capability::FanTelemetry]
         } else {
             vec![]
