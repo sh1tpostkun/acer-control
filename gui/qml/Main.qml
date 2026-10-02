@@ -138,14 +138,23 @@ ApplicationWindow {
                         ColumnLayout {
                             spacing: 2
                             Label {
-                                text: (backend.systemInfo && backend.systemInfo.laptop_model) ? backend.systemInfo.laptop_model : qsTr("Acer Laptop")
+                                text: backend.connected ? ((backend.systemInfo && backend.systemInfo.laptop_model) ? backend.systemInfo.laptop_model : qsTr("Acer Laptop")) : qsTr("Backend unavailable")
                                 font.bold: true
                                 color: textMain
                             }
-                            Label {
-                                text: "AcerControl"
-                                font.pixelSize: 12
-                                color: textMuted
+                            RowLayout {
+                                spacing: 4
+                                Rectangle {
+                                    width: 8
+                                    height: 8
+                                    radius: 4
+                                    color: backend.connected ? accentCyan : danger
+                                }
+                                Label {
+                                    text: backend.connected ? qsTr("Connected") : qsTr("Disconnected")
+                                    font.pixelSize: 12
+                                    color: textMuted
+                                }
                             }
                         }
                     }

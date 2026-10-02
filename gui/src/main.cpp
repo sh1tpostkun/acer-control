@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     });
 
     QString socketPath = "/run/acercontrol/daemon.sock";
-    if (parser.isSet(mockOption) || QFile::exists("/tmp/acercontrol_mock.sock")) {
+    if (parser.isSet(mockOption)) {
         socketPath = "/tmp/acercontrol_mock.sock";
     }
 

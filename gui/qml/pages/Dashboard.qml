@@ -11,15 +11,7 @@ Item {
     property var timeRangesPoints: [30, 300, 900, 1800]
     
     Component.onCompleted: {
-        var dummy = [];
-        var cpu = 15, ram = 45, temp = 50;
-        for (var i=0; i<1800; i++) {
-            cpu = Math.max(0, Math.min(100, cpu + (Math.random()*10 - 5)));
-            ram = Math.max(0, Math.min(100, ram + (Math.random()*2 - 1)));
-            temp = Math.max(30, Math.min(100, temp + (Math.random()*4 - 2)));
-            dummy.push({cpu: cpu, ram: ram, temp: temp});
-        }
-        historyData = dummy;
+        // Real history data is pushed by the backend telemetry events.
     }
     
     Connections {
@@ -141,7 +133,7 @@ Item {
                         }
                         
                         Label {
-                            text: backend.batteryStatus && backend.batteryStatus.is_charging ?qsTr("Charging") : (backend.batteryStatus ?qsTr("On Battery") : "")
+                            text: backend.connected ? (backend.batteryStatus && backend.batteryStatus.is_charging ? qsTr("Charging") : qsTr("On Battery")) : qsTr("Backend unavailable")
                             color: textMuted
                             font.pixelSize: 13
                             Layout.alignment: Qt.AlignHCenter
@@ -294,9 +286,7 @@ Item {
                     Repeater {
                         model: [
                             { name: "CPU", val: (backend.systemInfo && backend.systemInfo.temps && backend.systemInfo.temps.cpu_temp_c !== undefined) ? Math.round(backend.systemInfo.temps.cpu_temp_c) + "°C" : "--°C", icon: "<rect x='4' y='4' width='16' height='16' rx='2' ry='2'/><rect x='9' y='9' width='6' height='6'/>", color: accentBlue },
-                            { name: "GPU", val: (backend.systemInfo && backend.systemInfo.temps && backend.systemInfo.temps.gpu_temp_c !== undefined) ? Math.round(backend.systemInfo.temps.gpu_temp_c) + "°C" : "--°C", icon: "<rect x='2' y='3' width='20' height='14' rx='2' ry='2'/><line x1='8' y1='21' x2='16' y2='21'/><line x1='12' y1='17' x2='12' y2='21'/>", color: accentBlue },
-                            { name: "SSD", val: (backend.systemInfo && backend.systemInfo.temps && backend.systemInfo.temps.cpu_temp_c !== undefined) ? (Math.round(backend.systemInfo.temps.cpu_temp_c)-10) + "°C" : "--°C", icon: "<line x1='22' y1='12' x2='2' y2='12'/><path d='M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/>", color: "#A855F7" },
-                            { name:qsTr("Motherboard"), val: (backend.systemInfo && backend.systemInfo.temps && backend.systemInfo.temps.cpu_temp_c !== undefined) ? (Math.round(backend.systemInfo.temps.cpu_temp_c)-7) + "°C" : "--°C", icon: "<rect x='2' y='2' width='20' height='20' rx='2' ry='2'/><line x1='2' y1='12' x2='22' y2='12'/>", color: "#3B82F6" }
+                            { name: "GPU", val: (backend.systemInfo && backend.systemInfo.temps && backend.systemInfo.temps.gpu_temp_c !== undefined) ? Math.round(backend.systemInfo.temps.gpu_temp_c) + "°C" : "--°C", icon: "<rect x='2' y='3' width='20' height='14' rx='2' ry='2'/><line x1='8' y1='21' x2='16' y2='21'/><line x1='12' y1='17' x2='12' y2='21'/>", color: accentBlue }
                         ]
                         Rectangle {
                             Layout.fillWidth: true
@@ -325,32 +315,7 @@ Item {
                                     font.bold: true
                                     color: textMain
                                 }
-                                // fake line graph
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 20
-                                    color: "transparent"
-                                    clip: true
-                                    Canvas {
-                                        anchors.fill: parent
-                                        onWidthChanged: requestPaint()
-                                        onHeightChanged: requestPaint()
-                                        onPaint: {
-                                            var ctx = getContext("2d");
-                                            ctx.clearRect(0,0,width,height);
-                                            ctx.strokeStyle = modelData.color;
-                                            ctx.lineWidth = 2;
-                                            ctx.beginPath();
-                                            ctx.moveTo(0, height*0.8);
-                                            ctx.lineTo(width*0.2, height*0.5);
-                                            ctx.lineTo(width*0.4, height*0.6);
-                                            ctx.lineTo(width*0.6, height*0.2);
-                                            ctx.lineTo(width*0.8, height*0.4);
-                                            ctx.lineTo(width, height*0.1);
-                                            ctx.stroke();
-                                        }
-                                    }
-                                }
+                                Item { Layout.fillHeight: true }
                             }
                         }
                     }
