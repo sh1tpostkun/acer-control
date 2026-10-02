@@ -247,7 +247,7 @@ impl BackendManager {
                 continue;
             }
             if backend.capabilities().await.contains(&Capability::PerformanceMode) {
-                match backend.set_performance_mode(mode).await {
+                match backend.set_performance_mode(mode.clone()).await {
                     Ok(()) => return Ok(()),
                     Err(e) => {
                         warn!("Backend {} failed to set performance mode: {}", backend.name(), e);
@@ -267,7 +267,7 @@ impl BackendManager {
                 continue;
             }
             if backend.capabilities().await.contains(&Capability::FanControl) {
-                match backend.set_fan_mode(mode).await {
+                match backend.set_fan_mode(mode.clone()).await {
                     Ok(()) => return Ok(()),
                     Err(e) => {
                         warn!("Backend {} failed to set fan mode: {}", backend.name(), e);

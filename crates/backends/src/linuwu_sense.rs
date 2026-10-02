@@ -287,7 +287,7 @@ impl HardwareBackend for Backend {
             .ok_or_else(|| ErrorInfo::not_supported("battery_limiter attribute not found"))?;
 
         if limit != 80 && limit != 100 {
-            return Err(ErrorInfo::invalid_argument("Acer battery limiter only supports exactly 80 (on) or 100 (off)"));
+            return Err(ErrorInfo::new("Acer battery limiter only supports exactly 80 (on) or 100 (off)"));
         }
         let val = if limit == 80 { "1" } else { "0" };
         Self::write_sysfs(&bat_path, val)?;
