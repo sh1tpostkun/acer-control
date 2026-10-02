@@ -218,7 +218,3 @@ Contributions, bug reports, and hardware compatibility feedback are always welco
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)** — see the [LICENSE](LICENSE) file for details.
 
 ---
-
-<p align="center">
-  Made with ❤️ for the Linux & Acer Community
-</p>
