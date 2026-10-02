@@ -14,6 +14,11 @@ if ! getent group acercontrol >/dev/null; then
     groupadd -r acercontrol || true
 fi
 
+if [ -n "$SUDO_USER" ]; then
+    usermod -aG acercontrol "$SUDO_USER"
+    echo "Added user $SUDO_USER to acercontrol group."
+fi
+
 # Install binaries
 install -m 755 target/release/acercontrol-daemon /usr/local/bin/acercontrol-daemon
 install -m 755 target/release/acercontrol-cli /usr/local/bin/acercontrol

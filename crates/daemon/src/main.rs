@@ -64,7 +64,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let listener = UnixListener::bind(&socket_path)?;
     let _ = fs::set_permissions(
         &socket_path,
-        std::os::unix::fs::PermissionsExt::from_mode(0o660),
+        std::os::unix::fs::PermissionsExt::from_mode(0o666),
     );
     let _ = std::process::Command::new("chgrp")
         .arg("acercontrol")
