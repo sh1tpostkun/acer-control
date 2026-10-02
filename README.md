@@ -92,7 +92,7 @@ AcerControl uses a decoupled client-server architecture:
                 │                                        │
                 └───────────────┐        ┌───────────────┘
                                 ▼        ▼
-                     Unix Socket (/tmp/acercontrol.sock)
+                     Unix Socket (/run/acercontrol/daemon.sock)
                                 │
                                 ▼
                 ┌────────────────────────────────┐

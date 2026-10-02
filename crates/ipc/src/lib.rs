@@ -3,7 +3,7 @@ use acercontrol_core::{
     FanMode, ThermalProfile, Capability, Telemetry, SystemIdentification, CapabilitiesMap,
 };
 
-pub const SOCKET_PATH: &str = "/tmp/acercontrol.sock";
+pub const SOCKET_PATH: &str = "/run/acercontrol/daemon.sock";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcRequest {
