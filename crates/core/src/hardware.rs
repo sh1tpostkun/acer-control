@@ -33,15 +33,19 @@ impl std::fmt::Display for ThermalProfile {
 pub struct SystemTelemetry {
     pub cpu_usage: Option<f32>,
     pub gpu_usage: Option<f32>,
+    #[serde(rename = "ram_used")]
     pub ram_used_gb: Option<f32>,
+    #[serde(rename = "ram_total")]
     pub ram_total_gb: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "vram_used")]
     pub vram_used_gb: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "vram_total")]
     pub vram_total_gb: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gpu_name: Option<String>,
+    #[serde(rename = "disk_used")]
     pub disk_used_gb: Option<f32>,
+    #[serde(rename = "disk_total")]
     pub disk_total_gb: Option<f32>,
 }
 
