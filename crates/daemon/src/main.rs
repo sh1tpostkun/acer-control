@@ -212,6 +212,7 @@ async fn process_request(
                 }
             };
             r.push_str(&format!("  Fan telemetry:      {}\n", fmt_cap(&caps.fan_telemetry)));
+            r.push_str(&format!("  GPU telemetry:      {}\n", fmt_cap(&caps.gpu_telemetry)));
             r.push_str(&format!("  Fan control:        {}\n", fmt_cap(&caps.fan_control)));
             r.push_str(&format!("  Thermal profiles:   {}\n", fmt_cap(&caps.thermal_profile)));
             r.push_str(&format!("  Battery limit:      {}\n", fmt_cap(&caps.battery_limit)));

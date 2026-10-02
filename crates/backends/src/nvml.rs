@@ -71,7 +71,16 @@ impl NvmlBindings {
                 let get_memory = libc::dlsym(lib, b"nvmlDeviceGetMemoryInfo\0".as_ptr() as *const c_char);
                 let get_power = libc::dlsym(lib, b"nvmlDeviceGetPowerUsage\0".as_ptr() as *const c_char);
 
-                if init.is_null() || shutdown.is_null() || get_handle.is_null() || get_temperature.is_null() {
+                if init.is_null() 
+                    || shutdown.is_null() 
+                    || get_count.is_null()
+                    || get_handle.is_null() 
+                    || get_name.is_null()
+                    || get_temperature.is_null()
+                    || get_utilization.is_null()
+                    || get_memory.is_null()
+                    || get_power.is_null() 
+                {
                     libc::dlclose(lib);
                     continue;
                 }
@@ -127,7 +136,7 @@ impl HardwareBackend for Backend {
                 info!("[nvml] found {} NVIDIA GPU device(s)", count);
                 let mut details = vec![];
                 details.push(CapabilityDetail::new(
-                    Capability::FanTelemetry,
+                    Capability::GpuTelemetry,
                     Some("libnvidia-ml.so.1 (NVIDIA GPU telemetry)"),
                 ));
 
@@ -143,7 +152,7 @@ impl HardwareBackend for Backend {
     async fn capabilities(&self) -> Vec<Capability> {
         let lock = self.bindings.lock().unwrap();
         if lock.is_some() {
-            vec![Capability::FanTelemetry]
+            vec![Capability::GpuTelemetry]
         } else {
             vec![]
         }
@@ -198,6 +207,10 @@ impl HardwareBackend for Backend {
         }
 
         Ok(tel)
+    }
+
+    async fn get_thermal_profile(&self) -> Result<ThermalProfile> {
+        Err(ErrorInfo::not_supported("NVML does not support ACPI thermal profiles"))
     }
 
     async fn set_performance_mode(&self, _mode: ThermalProfile) -> Result<()> {

@@ -264,6 +264,10 @@ impl HardwareBackend for Backend {
         Ok(tel)
     }
 
+    async fn get_thermal_profile(&self) -> Result<ThermalProfile> {
+        Err(ErrorInfo::not_supported("hwmon does not provide thermal profiles"))
+    }
+
     async fn set_performance_mode(&self, _mode: ThermalProfile) -> Result<()> {
         Err(ErrorInfo::not_supported("hwmon does not control performance modes"))
     }

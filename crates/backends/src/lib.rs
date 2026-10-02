@@ -14,6 +14,7 @@ pub trait HardwareBackend: Send + Sync {
     async fn probe(&self) -> ProbeResult;
     async fn capabilities(&self) -> Vec<Capability>;
     async fn telemetry(&self) -> Result<Telemetry>;
+    async fn get_thermal_profile(&self) -> Result<ThermalProfile>;
     async fn set_performance_mode(&self, mode: ThermalProfile) -> Result<()>;
     async fn set_fan_mode(&self, mode: FanMode) -> Result<()>;
     async fn set_fan_speed(&self, cpu_percent: u8, gpu_percent: u8) -> Result<()>;
@@ -99,6 +100,11 @@ impl BackendManager {
                     Capability::FanTelemetry => {
                         if !map.fan_telemetry.is_supported() {
                             map.fan_telemetry = status;
+                        }
+                    }
+                    Capability::GpuTelemetry => {
+                        if !map.gpu_telemetry.is_supported() {
+                            map.gpu_telemetry = status;
                         }
                     }
                     Capability::PerformanceMode => {
@@ -234,18 +240,24 @@ impl BackendManager {
         Ok(agg)
     }
 
-    /// Route a set_performance_mode to the first capable backend.
+    /// Route a set_performance_mode to the first successfully responding capable backend.
     pub async fn set_performance_mode(&self, mode: ThermalProfile) -> Result<()> {
         for backend in &self.backends {
             if !self.is_active(backend.name()) {
                 continue;
             }
             if backend.capabilities().await.contains(&Capability::PerformanceMode) {
-                return backend.set_performance_mode(mode).await;
+                match backend.set_performance_mode(mode).await {
+                    Ok(()) => return Ok(()),
+                    Err(e) => {
+                        warn!("Backend {} failed to set performance mode: {}", backend.name(), e);
+                        continue;
+                    }
+                }
             }
         }
         Err(ErrorInfo::not_supported(
-            "No backend supports ACPI performance modes on this hardware",
+            "No active backend successfully supported ACPI performance modes on this hardware",
         ))
     }
 
@@ -255,11 +267,17 @@ impl BackendManager {
                 continue;
             }
             if backend.capabilities().await.contains(&Capability::FanControl) {
-                return backend.set_fan_mode(mode).await;
+                match backend.set_fan_mode(mode).await {
+                    Ok(()) => return Ok(()),
+                    Err(e) => {
+                        warn!("Backend {} failed to set fan mode: {}", backend.name(), e);
+                        continue;
+                    }
+                }
             }
         }
         Err(ErrorInfo::not_supported(
-            "No backend supports fan mode control on this hardware",
+            "No active backend successfully supported fan mode control on this hardware",
         ))
     }
 
@@ -269,11 +287,17 @@ impl BackendManager {
                 continue;
             }
             if backend.capabilities().await.contains(&Capability::FanControl) {
-                return backend.set_fan_speed(cpu, gpu).await;
+                match backend.set_fan_speed(cpu, gpu).await {
+                    Ok(()) => return Ok(()),
+                    Err(e) => {
+                        warn!("Backend {} failed to set fan speed: {}", backend.name(), e);
+                        continue;
+                    }
+                }
             }
         }
         Err(ErrorInfo::not_supported(
-            "No backend supports fan speed adjustment on this hardware",
+            "No active backend successfully supported fan speed adjustment on this hardware",
         ))
     }
 
@@ -283,11 +307,17 @@ impl BackendManager {
                 continue;
             }
             if backend.capabilities().await.contains(&Capability::BatteryChargeLimit) {
-                return backend.set_battery_limit(limit).await;
+                match backend.set_battery_limit(limit).await {
+                    Ok(()) => return Ok(()),
+                    Err(e) => {
+                        warn!("Backend {} failed to set battery limit: {}", backend.name(), e);
+                        continue;
+                    }
+                }
             }
         }
         Err(ErrorInfo::not_supported(
-            "No backend supports battery charge limiting on this hardware",
+            "No active backend successfully supported battery charge limiting on this hardware",
         ))
     }
 
@@ -297,26 +327,37 @@ impl BackendManager {
                 continue;
             }
             if backend.capabilities().await.contains(&Capability::KeyboardBacklight) {
-                return backend.set_keyboard_timeout(timeout_s).await;
+                match backend.set_keyboard_timeout(timeout_s).await {
+                    Ok(()) => return Ok(()),
+                    Err(e) => {
+                        warn!("Backend {} failed to set keyboard timeout: {}", backend.name(), e);
+                        continue;
+                    }
+                }
             }
         }
         Err(ErrorInfo::not_supported(
-            "No backend supports keyboard backlight timeout on this hardware",
+            "No active backend successfully supported keyboard backlight timeout on this hardware",
         ))
     }
 
-    /// Read the current active platform profile string from sysfs.
+    /// Read the current active platform profile from the first successfully responding capable backend.
     pub async fn get_thermal_profile(&self) -> Result<ThermalProfile> {
-        if let Ok(val) = std::fs::read_to_string("/sys/firmware/acpi/platform_profile") {
-            let profile = match val.trim() {
-                "low-power" | "quiet" => ThermalProfile::Silent,
-                "balanced" => ThermalProfile::Balanced,
-                "balanced-performance" | "performance" => ThermalProfile::Performance,
-                "turbo" => ThermalProfile::Turbo,
-                _ => ThermalProfile::Balanced,
-            };
-            return Ok(profile);
+        for backend in &self.backends {
+            if !self.is_active(backend.name()) {
+                continue;
+            }
+            if backend.capabilities().await.contains(&Capability::PerformanceMode) {
+                match backend.get_thermal_profile().await {
+                    Ok(profile) => return Ok(profile),
+                    Err(e) => {
+                        warn!("Backend {} failed to get thermal profile: {}", backend.name(), e);
+                        continue;
+                    }
+                }
+            }
         }
         Ok(ThermalProfile::Balanced)
     }
 }
+

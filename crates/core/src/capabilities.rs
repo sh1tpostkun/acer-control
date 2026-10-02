@@ -5,6 +5,7 @@ pub enum Capability {
     PerformanceMode,
     FanControl,
     FanTelemetry,
+    GpuTelemetry,
     BatteryChargeLimit,
     KeyboardBacklight,
     GpuMode,
@@ -66,6 +67,7 @@ impl CapabilityStatus {
 pub struct CapabilitiesMap {
     pub fan_control: CapabilityStatus,
     pub fan_telemetry: CapabilityStatus,
+    pub gpu_telemetry: CapabilityStatus,
     pub thermal_profile: CapabilityStatus,
     pub battery_limit: CapabilityStatus,
     pub keyboard_backlight: CapabilityStatus,
@@ -79,6 +81,7 @@ impl Default for CapabilitiesMap {
         Self {
             fan_control: CapabilityStatus::Unsupported,
             fan_telemetry: CapabilityStatus::Unsupported,
+            gpu_telemetry: CapabilityStatus::Unsupported,
             thermal_profile: CapabilityStatus::Unsupported,
             battery_limit: CapabilityStatus::Unsupported,
             keyboard_backlight: CapabilityStatus::Unsupported,

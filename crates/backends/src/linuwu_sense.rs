@@ -179,6 +179,20 @@ impl HardwareBackend for Backend {
         Ok(tel)
     }
 
+    async fn get_thermal_profile(&self) -> Result<ThermalProfile> {
+        if let Ok(val) = Self::read_sysfs(Path::new(PLATFORM_PROFILE)) {
+            let profile = match val.as_str() {
+                "low-power" | "quiet" => ThermalProfile::Silent,
+                "balanced" => ThermalProfile::Balanced,
+                "balanced-performance" | "performance" => ThermalProfile::Performance,
+                "turbo" => ThermalProfile::Turbo,
+                _ => ThermalProfile::Balanced,
+            };
+            return Ok(profile);
+        }
+        Err(ErrorInfo::not_supported("ACPI platform_profile not found or not readable"))
+    }
+
     async fn set_performance_mode(&self, mode: ThermalProfile) -> Result<()> {
         let choices_str = Self::read_sysfs(Path::new(PLATFORM_PROFILE_CHOICES))
             .unwrap_or_default();
