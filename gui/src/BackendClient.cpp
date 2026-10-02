@@ -275,9 +275,23 @@ void BackendClient::onReadyRead()
 
 void BackendClient::handleMessage(const QJsonObject &msg)
 {
-    // Responses from daemon are like `{"Capabilities": {...}}` or `{"Telemetry": {...}}`
     if (msg.contains("Capabilities")) {
-        m_capabilities = msg["Capabilities"].toObject();
+        QJsonObject raw = msg["Capabilities"].toObject();
+        QJsonObject processed;
+        for (auto it = raw.begin(); it != raw.end(); ++it) {
+            bool supported = false;
+            if (it.value().isBool()) {
+                supported = it.value().toBool();
+            } else if (it.value().isObject()) {
+                QJsonObject obj = it.value().toObject();
+                supported = (obj["status"].toString() == "Supported");
+            } else if (it.value().isString()) {
+                supported = (it.value().toString() == "Supported");
+            }
+            processed[it.key()] = supported;
+            processed[it.key() + "_info"] = it.value();
+        }
+        m_capabilities = processed;
         emit capabilitiesChanged(m_capabilities);
     } else if (msg.contains("SystemInfo")) {
         m_systemInfo = msg["SystemInfo"].toObject();

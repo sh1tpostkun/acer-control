@@ -8,6 +8,12 @@ fi
 
 echo "Installing AcerControl..."
 
+# Ensure group acercontrol exists
+if ! getent group acercontrol >/dev/null; then
+    echo "Creating 'acercontrol' system group..."
+    groupadd -r acercontrol || true
+fi
+
 # Install binaries
 install -m 755 target/release/acercontrol-daemon /usr/local/bin/acercontrol-daemon
 install -m 755 target/release/acercontrol-cli /usr/local/bin/acercontrol

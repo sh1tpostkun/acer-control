@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+libc = "0.2"
 acercontrol-core = { version = "0.1.0", path = "../core" }
 async-trait = "0.1.92"
 log = "0.4.34"

@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "acercontrol-core",
  "async-trait",
+ "libc",
  "log",
  "rand",
  "sysinfo",

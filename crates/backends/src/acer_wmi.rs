@@ -12,7 +12,7 @@ impl HardwareBackend for Backend {
 
     async fn probe(&self) -> ProbeResult {
         // linuwu-sense already wraps acer-wmi, so we don't double-register
-        ProbeResult { available: false, active_capabilities: vec![] }
+        ProbeResult::simple(false, vec![])
     }
 
     async fn capabilities(&self) -> Vec<Capability> { vec![] }

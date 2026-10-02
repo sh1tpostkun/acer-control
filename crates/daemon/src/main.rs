@@ -7,12 +7,12 @@ use tokio::sync::broadcast;
 use std::time::Duration;
 use clap::Parser;
 
-use acercontrol_ipc::{IpcEvent, IpcRequest, IpcResponse};
+use acercontrol_ipc::{DoctorData, IpcEvent, IpcRequest, IpcResponse};
 use acercontrol_backends::{BackendManager, hwmon, acer_wmi, linuwu_sense, nvml, sysfs};
 use acercontrol_core::*;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about = "AcerControl Daemon", long_about = None)]
 struct Args {
     #[arg(short, long)]
     socket: Option<String>,
@@ -34,12 +34,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     info!("System: {} {} (Board: {})", sys_id.vendor, sys_id.product, sys_id.board);
 
     // Register backends in priority order:
-    // linuwu-sense first (control), then hwmon (telemetry), then stubs
+    // 1. NVML (dedicated NVIDIA GPU telemetry)
+    // 2. linuwu-sense (fan control, profiles, battery limit, keyboard timeout)
+    // 3. hwmon (sensors: CPU/GPU temps, fan RPM, battery status)
+    // 4. acer-wmi & sysfs (fallback / future drivers)
     let mut manager = BackendManager::new();
+    manager.add_backend(Box::new(nvml::Backend::new()));
     manager.add_backend(Box::new(linuwu_sense::Backend::new()));
     manager.add_backend(Box::new(hwmon::Backend::new()));
     manager.add_backend(Box::new(acer_wmi::Backend));
-    manager.add_backend(Box::new(nvml::Backend));
     manager.add_backend(Box::new(sysfs::Backend));
 
     manager.initialize().await;
@@ -66,6 +69,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let _ = std::process::Command::new("chgrp")
         .arg("acercontrol")
         .arg(&socket_path)
+        .stderr(std::process::Stdio::null())
         .status();
 
     info!("Listening on {}", socket_path);
@@ -119,7 +123,7 @@ async fn handle_client(
     mut stream: UnixStream,
     state: Arc<AppState>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let mut buf = vec![0u8; 4096];
+    let mut buf = vec![0u8; 8192];
     let mut rx = state.event_tx.subscribe();
     let mut is_subscribed = false;
 
@@ -168,6 +172,7 @@ async fn process_request(
         IpcRequest::Doctor => {
             let sys = SystemIdentification::probe();
             let caps = manager.get_capabilities().await;
+            let tel = manager.get_telemetry().await.unwrap_or_default();
             let kernel = std::fs::read_to_string("/proc/version")
                 .unwrap_or_default()
                 .split_whitespace()
@@ -193,7 +198,13 @@ async fn process_request(
             r.push_str("\nCAPABILITIES\n");
             let fmt_cap = |s: &CapabilityStatus| -> String {
                 match s {
-                    CapabilityStatus::Supported { backend } => format!("✓  ({})", backend),
+                    CapabilityStatus::Supported { backend, source } => {
+                        if let Some(src) = source {
+                            format!("✓  ({} -> {})", backend, src)
+                        } else {
+                            format!("✓  ({})", backend)
+                        }
+                    }
                     CapabilityStatus::Unsupported => "—".to_string(),
                     CapabilityStatus::Unavailable => "unavailable".to_string(),
                     CapabilityStatus::PermissionDenied => "permission denied".to_string(),
@@ -209,7 +220,18 @@ async fn process_request(
             r.push_str(&format!("  CPU power limit:    {}\n", fmt_cap(&caps.cpu_power_limit)));
             r.push_str(&format!("  GPU power limit:    {}\n", fmt_cap(&caps.gpu_power_limit)));
 
-            IpcResponse::DoctorReport(r)
+            let doctor_data = DoctorData {
+                system: sys,
+                kernel,
+                active_backends: manager.active_backends().to_vec(),
+                capabilities: caps,
+                telemetry: tel,
+            };
+
+            IpcResponse::DoctorReport {
+                text: r,
+                data: doctor_data,
+            }
         }
 
         IpcRequest::GetCapabilities => {

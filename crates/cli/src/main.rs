@@ -5,7 +5,7 @@ use acercontrol_ipc::{IpcRequest, IpcResponse};
 use acercontrol_core::{FanMode, ThermalProfile};
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about = "AcerControl CLI tool", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -18,9 +18,9 @@ struct Cli {
 enum Commands {
     Status,
     Doctor {
-        #[arg(long)]
+        #[arg(long, help = "Output raw diagnostic data in JSON format")]
         json: bool,
-        #[arg(long)]
+        #[arg(long, help = "Generate anonymized hardware compatibility report")]
         share: bool,
     },
     Capabilities,
@@ -42,6 +42,13 @@ enum Commands {
 enum FanAction {
     Status,
     Auto,
+    Max,
+    Set {
+        #[arg(short, long, default_value_t = 100)]
+        cpu: u8,
+        #[arg(short, long, default_value_t = 100)]
+        gpu: u8,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -59,7 +66,7 @@ async fn send_request(req: IpcRequest, socket_path: &str) -> std::result::Result
     let json = serde_json::to_string(&req)?;
     stream.write_all(format!("{}\n", json).as_bytes()).await?;
 
-    let mut buf = vec![0u8; 4096];
+    let mut buf = vec![0u8; 8192];
     let n = stream.read(&mut buf).await?;
     let response_str = String::from_utf8_lossy(&buf[..n]);
     
@@ -78,22 +85,26 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             println!("{:#?}", res);
         }
         Commands::Doctor { json, share } => {
-            if share {
-                println!("AcerControl diagnostic report would be shared here (Anonymized).");
-                println!("Thank you for helping to improve compatibility!");
-                return Ok(());
-            }
-
             let res = send_request(IpcRequest::Doctor, &socket_path).await?;
             match res {
-                IpcResponse::DoctorReport(report) => {
+                IpcResponse::DoctorReport { text, data } => {
                     if json {
-                        println!(r#"{{"diagnostic": "report"}}"#);
+                        println!("{}", serde_json::to_string_pretty(&data)?);
+                    } else if share {
+                        println!("AcerControl Anonymized Diagnostic Report");
+                        println!("========================================");
+                        println!("Model:    {} {}", data.system.vendor, data.system.product);
+                        println!("Board:    {}", data.system.board);
+                        println!("Kernel:   {}", data.kernel);
+                        println!("Backends: {:?}", data.active_backends);
+                        println!("\nCapabilities JSON:\n{}", serde_json::to_string_pretty(&data.capabilities)?);
+                        println!("\n(You can copy and submit this report to: https://github.com/sh1tpostkun/acer-control/issues)");
                     } else {
-                        println!("{}", report);
+                        println!("{}", text);
                     }
                 }
-                _ => println!("Failed to get doctor report."),
+                IpcResponse::Error(e) => eprintln!("Daemon error: {}", e),
+                other => eprintln!("Unexpected daemon response: {:?}", other),
             }
         }
         Commands::Capabilities => {
@@ -109,16 +120,24 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 let res = send_request(IpcRequest::SetFanMode { mode: FanMode::Auto }, &socket_path).await?;
                 println!("{:?}", res);
             }
+            FanAction::Max => {
+                let res = send_request(IpcRequest::SetFanSpeed { cpu_percent: 100, gpu_percent: 100 }, &socket_path).await?;
+                println!("Fans set to maximum (100%): {:?}", res);
+            }
+            FanAction::Set { cpu, gpu } => {
+                let res = send_request(IpcRequest::SetFanSpeed { cpu_percent: cpu, gpu_percent: gpu }, &socket_path).await?;
+                println!("Fans set to CPU: {}%, GPU: {}%: {:?}", cpu, gpu, res);
+            }
         },
         Commands::Profile { action } => match action {
             ProfileAction::Set { profile } => {
                 let p = match profile.to_lowercase().as_str() {
-                    "silent" => ThermalProfile::Silent,
+                    "silent" | "quiet" => ThermalProfile::Silent,
                     "balanced" => ThermalProfile::Balanced,
                     "performance" => ThermalProfile::Performance,
                     "turbo" => ThermalProfile::Turbo,
                     _ => {
-                        println!("Invalid profile.");
+                        eprintln!("Invalid profile. Supported: silent, balanced, performance, turbo");
                         return Ok(());
                     }
                 };

@@ -10,16 +10,16 @@ impl ErrorInfo {
         Self { message: msg.into() }
     }
 
-    pub fn permission_denied(resource: &str) -> Self {
-        Self { message: format!("Permission denied: {}", resource) }
+    pub fn permission_denied(resource: impl Into<String>) -> Self {
+        Self { message: format!("Permission denied: {}", resource.into()) }
     }
 
-    pub fn not_supported(what: &str) -> Self {
-        Self { message: format!("Not supported: {}", what) }
+    pub fn not_supported(what: impl Into<String>) -> Self {
+        Self { message: format!("Not supported: {}", what.into()) }
     }
 
-    pub fn io_error(path: &str, err: std::io::Error) -> Self {
-        Self { message: format!("{}: {}", path, err) }
+    pub fn io_error(path: impl Into<String>, err: std::io::Error) -> Self {
+        Self { message: format!("{}: {}", path.into(), err) }
     }
 }
 

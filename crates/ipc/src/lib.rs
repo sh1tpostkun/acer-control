@@ -6,6 +6,15 @@ use acercontrol_core::{
 pub const SOCKET_PATH: &str = "/run/acercontrol/daemon.sock";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DoctorData {
+    pub system: SystemIdentification,
+    pub kernel: String,
+    pub active_backends: Vec<String>,
+    pub capabilities: CapabilitiesMap,
+    pub telemetry: Telemetry,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcRequest {
     Ping,
     Doctor,
@@ -29,7 +38,10 @@ pub enum IpcResponse {
     Ok,
     Pong,
     Error(String),
-    DoctorReport(String),
+    DoctorReport {
+        text: String,
+        data: DoctorData,
+    },
     Capabilities(CapabilitiesMap),
     Telemetry(Telemetry),
     SystemIdentification(SystemIdentification),

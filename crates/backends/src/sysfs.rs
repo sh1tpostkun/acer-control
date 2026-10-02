@@ -9,7 +9,7 @@ impl HardwareBackend for Backend {
     fn name(&self) -> &'static str { "sysfs" }
 
     async fn probe(&self) -> ProbeResult {
-        ProbeResult { available: false, active_capabilities: vec![] }
+        ProbeResult::simple(false, vec![])
     }
 
     async fn capabilities(&self) -> Vec<Capability> { vec![] }

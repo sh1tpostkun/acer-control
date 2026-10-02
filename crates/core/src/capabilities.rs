@@ -13,8 +13,28 @@ pub enum Capability {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CapabilityDetail {
+    pub capability: Capability,
+    pub source: Option<String>,
+}
+
+impl CapabilityDetail {
+    pub fn new(capability: Capability, source: Option<impl Into<String>>) -> Self {
+        Self {
+            capability,
+            source: source.map(|s| s.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status")]
 pub enum CapabilityStatus {
-    Supported { backend: String },
+    Supported {
+        backend: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
+    },
     Unsupported,
     Unavailable,
     PermissionDenied,
@@ -25,9 +45,23 @@ impl CapabilityStatus {
     pub fn is_supported(&self) -> bool {
         matches!(self, CapabilityStatus::Supported { .. })
     }
+
+    pub fn backend(&self) -> Option<&str> {
+        match self {
+            CapabilityStatus::Supported { backend, .. } => Some(backend),
+            _ => None,
+        }
+    }
+
+    pub fn source(&self) -> Option<&str> {
+        match self {
+            CapabilityStatus::Supported { source: Some(s), .. } => Some(s),
+            _ => None,
+        }
+    }
 }
 
-/// Rich capabilities map sent to GUI — each field carries status + backend info.
+/// Rich capabilities map sent to GUI and CLI — each field carries status, backend, and source info.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilitiesMap {
     pub fan_control: CapabilityStatus,

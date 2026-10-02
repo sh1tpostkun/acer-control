@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::capabilities::{Capability, CapabilityDetail};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FanMode {
@@ -34,12 +35,31 @@ pub struct SystemTelemetry {
     pub gpu_usage: Option<f32>,
     pub ram_used_gb: Option<f32>,
     pub ram_total_gb: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vram_used_gb: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vram_total_gb: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct TempTelemetry {
     pub cpu_c: Option<u8>,
     pub gpu_c: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_temp_c: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_temp_c: Option<u8>,
+}
+
+impl TempTelemetry {
+    pub fn sync_aliases(&mut self) {
+        if self.cpu_temp_c.is_none() { self.cpu_temp_c = self.cpu_c; }
+        if self.cpu_c.is_none() { self.cpu_c = self.cpu_temp_c; }
+        if self.gpu_temp_c.is_none() { self.gpu_temp_c = self.gpu_c; }
+        if self.gpu_c.is_none() { self.gpu_c = self.gpu_temp_c; }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -49,6 +69,19 @@ pub struct FanTelemetry {
     pub gpu_rpm: Option<u32>,
     pub cpu_percent: Option<u8>,
     pub gpu_percent: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_speed_percent: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gpu_speed_percent: Option<u8>,
+}
+
+impl FanTelemetry {
+    pub fn sync_aliases(&mut self) {
+        if self.cpu_speed_percent.is_none() { self.cpu_speed_percent = self.cpu_percent; }
+        if self.cpu_percent.is_none() { self.cpu_percent = self.cpu_speed_percent; }
+        if self.gpu_speed_percent.is_none() { self.gpu_speed_percent = self.gpu_percent; }
+        if self.gpu_percent.is_none() { self.gpu_percent = self.gpu_speed_percent; }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -70,6 +103,13 @@ pub struct Telemetry {
     pub fans: FanTelemetry,
     pub power: PowerTelemetry,
     pub battery: BatteryTelemetry,
+}
+
+impl Telemetry {
+    pub fn sync_all(&mut self) {
+        self.temps.sync_aliases();
+        self.fans.sync_aliases();
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -101,5 +141,19 @@ impl SystemIdentification {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProbeResult {
     pub available: bool,
-    pub active_capabilities: Vec<crate::capabilities::Capability>,
+    pub active_capabilities: Vec<Capability>,
+    #[serde(default)]
+    pub details: Vec<CapabilityDetail>,
+}
+
+impl ProbeResult {
+    pub fn simple(available: bool, active_capabilities: Vec<Capability>) -> Self {
+        let details = active_capabilities.iter().map(|&c| CapabilityDetail::new(c, None::<String>)).collect();
+        Self { available, active_capabilities, details }
+    }
+
+    pub fn with_details(available: bool, details: Vec<CapabilityDetail>) -> Self {
+        let active_capabilities = details.iter().map(|d| d.capability).collect();
+        Self { available, active_capabilities, details }
+    }
 }
