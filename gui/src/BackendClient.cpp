@@ -4,7 +4,7 @@
 #include <QJsonParseError>
 #include <QDebug>
 #include <QTimer>
-#include <cstdlib>
+
 #include <QSettings>
 #include <QProcess>
 #include <QFile>
@@ -115,14 +115,21 @@ void BackendClient::setBluetoothEnabled(bool enabled)
 
 void BackendClient::refreshNetworkState()
 {
-    bool wifiBlocked = (system("rfkill list wifi | grep -q 'Soft blocked: yes'") == 0);
-    bool btBlocked = (system("rfkill list bluetooth | grep -q 'Soft blocked: yes'") == 0);
-    
+    QProcess wifiProc;
+    wifiProc.start("rfkill", QStringList() << "-J" << "list" << "wifi");
+    wifiProc.waitForFinished(500);
+    bool wifiBlocked = wifiProc.readAllStandardOutput().contains("blocked");
+
+    QProcess btProc;
+    btProc.start("rfkill", QStringList() << "-J" << "list" << "bluetooth");
+    btProc.waitForFinished(500);
+    bool btBlocked = btProc.readAllStandardOutput().contains("blocked");
+
     if (m_wifiEnabled == wifiBlocked) {
         m_wifiEnabled = !wifiBlocked;
         emit wifiEnabledChanged(m_wifiEnabled);
     }
-    
+
     if (m_bluetoothEnabled == btBlocked) {
         m_bluetoothEnabled = !btBlocked;
         emit bluetoothEnabledChanged(m_bluetoothEnabled);

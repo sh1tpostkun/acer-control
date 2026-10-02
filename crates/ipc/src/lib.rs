@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use acercontrol_core::{
-    FanMode, ThermalProfile, Capability, Telemetry, SystemIdentification, CapabilitiesMap,
+    FanMode, ThermalProfile, Telemetry, SystemIdentification, CapabilitiesMap,
 };
 
 pub const SOCKET_PATH: &str = "/run/acercontrol/daemon.sock";
