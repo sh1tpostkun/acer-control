@@ -22,7 +22,25 @@
 
 **AcerControl** is a native, modern control center designed specifically for Acer laptops (Nitro and Predator series) running Linux. Built with a modular architecture featuring a high-performance **Rust** background daemon and a sleek **Qt 6 / QML** graphical interface, AcerControl provides comprehensive hardware control, real-time monitoring, and hardware hotkey support without bloat.
 
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="AcerControl Dashboard Preview" width="850">
+</p>
+
 ---
+
+## 📸 Screenshots
+
+| Dashboard & Telemetry | Power & Performance Profiles |
+|:---:|:---:|
+| <img src="docs/screenshots/dashboard.png" width="450" alt="Dashboard"> | <img src="docs/screenshots/performance.png" width="450" alt="Performance"> |
+
+<details>
+  <summary><strong>🔍 Click to view more screenshots (Display Settings)</strong></summary>
+  <br>
+  <p align="center">
+    <img src="docs/screenshots/display.png" width="750" alt="Display & Refresh Rates">
+  </p>
+</details>
 
 ## 🚀 Features
 
@@ -218,3 +236,7 @@ Contributions, bug reports, and hardware compatibility feedback are always welco
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)** — see the [LICENSE](LICENSE) file for details.
 
 ---
+
+<p align="center">
+  Made with ❤️ for the Linux & Acer Community
+</p>

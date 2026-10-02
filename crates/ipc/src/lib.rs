@@ -1,57 +1,37 @@
 use serde::{Deserialize, Serialize};
 use acercontrol_core::{
-    BatteryStatus, FanMode, FanStatus, HardwareCapabilities, PowerStatus, SystemInfo,
-    TemperatureStatus, ThermalProfile,
+    FanMode, ThermalProfile, Capability, Telemetry, SystemIdentification,
+    CapabilityStatus,
 };
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+pub const SOCKET_PATH: &str = "/var/run/acercontrol.sock";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcRequest {
-    GetCapabilities,
-    
-    GetFanStatus,
-    SetFanMode(FanMode),
-    SetFanSpeed { cpu_percent: u8, gpu_percent: u8 },
-    
-    GetThermalProfile,
-    SetThermalProfile(ThermalProfile),
-    
-    GetBatteryStatus,
-    SetBatteryLimit(u8),
-    SetUsbCharging(bool),
-    
-    GetTemperatures,
-    GetPower,
-    GetSystemInfo,
-    
-    SubscribeEvents,
     Ping,
+    Doctor,
+    GetCapabilities,
+    GetTelemetry,
+    GetSystemIdentification,
+    SetThermalProfile(ThermalProfile),
+    SetFanMode(FanMode),
+    SetBatteryLimit(u8),
+    SubscribeEvents,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcResponse {
     Ok,
-    Error(String),
-    Capabilities(HardwareCapabilities),
-    FanStatus(FanStatus),
-    ThermalProfile(ThermalProfile),
-    BatteryStatus(BatteryStatus),
-    Temperatures(TemperatureStatus),
-    Power(PowerStatus),
-    SystemInfo(SystemInfo),
     Pong,
+    Error(String),
+    DoctorReport(String),
+    Capabilities(Vec<Capability>),
+    Telemetry(Telemetry),
+    SystemIdentification(SystemIdentification),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IpcEvent {
-    Telemetry {
-        temps: TemperatureStatus,
-        fans: FanStatus,
-        power: PowerStatus,
-        battery: BatteryStatus,
-        system: SystemInfo,
-    },
+    TelemetryUpdate(Telemetry),
     ProfileChanged(ThermalProfile),
-    ToggleGui {},
 }
-
-pub const SOCKET_PATH: &str = "/tmp/acercontrol.sock";

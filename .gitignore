@@ -1,0 +1,41 @@
+# Rust
+target/
+**/*.rs.bk
+
+# CMake / Qt
+build/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+*.qm
+*.a
+*.so
+*.o
+*.moc
+*.qmlc
+*.jsc
+*.rcc
+*.ui
+Makefile
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.directory
+.qtc_clangd/
+
+# Python scripts (from fixing)
+*.py
+*.pyc
+__pycache__/
+
+# Logs
+*.log
+gui.log
+
+# Scratch
+scratch/
+test_*

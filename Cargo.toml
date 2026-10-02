@@ -2,7 +2,7 @@
 members = [
     "crates/core",
     "crates/daemon",
-    "crates/hardware",
+    "crates/backends",
     "crates/ipc",
     "crates/monitoring",
     "crates/config",

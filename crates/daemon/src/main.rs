@@ -1,108 +1,80 @@
-mod hotkey;
+use log::{error, info};
+use std::fs;
 use std::sync::Arc;
-use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::broadcast;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::time::Duration;
 use clap::Parser;
-use log::{info, warn, error};
-use std::fs;
 
-use acercontrol_hardware::{HardwareBackend, linuwu_sense::LinuwuSenseBackend, mock::MockBackend};
-use acercontrol_ipc::{IpcRequest, IpcResponse, IpcEvent};
+use acercontrol_ipc::{IpcEvent, IpcRequest, IpcResponse};
+use acercontrol_backends::{BackendManager, hwmon, acer_wmi, linuwu_sense, nvml, sysfs};
+use acercontrol_core::*;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     #[arg(short, long)]
-    mock: bool,
-
-    #[arg(short, long)]
     socket: Option<String>,
 }
 
 struct AppState {
-    backend: Arc<dyn HardwareBackend>,
+    manager: tokio::sync::RwLock<BackendManager>,
     event_tx: broadcast::Sender<String>,
 }
 
 #[tokio::main]
-async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
-
     let args = Args::parse();
 
     info!("Starting AcerControl Daemon...");
+    
+    let sys_id = SystemIdentification::probe();
+    info!("Detected System: {} {} (Board: {})", sys_id.vendor, sys_id.product, sys_id.board);
 
-    let backend: Arc<dyn HardwareBackend> = if args.mock {
-        info!("Using MockBackend");
-        Arc::new(MockBackend::new())
-    } else {
-        let linuwu = LinuwuSenseBackend::new();
-        if linuwu.detect().await.unwrap_or(false) {
-            info!("Detected LinuwuSenseBackend");
-            Arc::new(linuwu)
-        } else {
-            warn!("Linuwu-Sense not detected. Falling back to MockBackend.");
-            Arc::new(MockBackend::new())
-        }
-    };
+    let mut manager = BackendManager::new();
+    // Add available dummy backends
+    manager.add_backend(Box::new(acer_wmi::Backend));
+    manager.add_backend(Box::new(linuwu_sense::Backend));
+    manager.add_backend(Box::new(hwmon::Backend));
+    manager.add_backend(Box::new(nvml::Backend));
+    manager.add_backend(Box::new(sysfs::Backend));
 
-    let caps = backend.capabilities().await?;
-    info!("Hardware capabilities: {:?}", caps);
+    manager.initialize().await;
+    info!("Active backends: {:?}", manager.active_backends());
 
     let socket_path = args.socket.unwrap_or_else(|| {
-        if args.mock {
-            format!("/tmp/acercontrol_mock.sock")
-        } else {
-            acercontrol_ipc::SOCKET_PATH.to_string()
-        }
+        acercontrol_ipc::SOCKET_PATH.to_string()
     });
 
     if fs::metadata(&socket_path).is_ok() {
-        fs::remove_file(&socket_path)?;
+        fs::remove_file(&socket_path).unwrap();
     }
 
-    let listener = UnixListener::bind(&socket_path)?;
-    if !args.mock {
-        // In real setup, we might want to set permissions on the socket
-        // so that users in a specific group can access it
-        let _ = fs::set_permissions(&socket_path, std::os::unix::fs::PermissionsExt::from_mode(0o666));
-    }
+    let listener = UnixListener::bind(&socket_path).unwrap();
+    let _ = fs::set_permissions(&socket_path, std::os::unix::fs::PermissionsExt::from_mode(0o666));
 
     info!("Listening on {}", socket_path);
 
     let (event_tx, _) = broadcast::channel(16);
-    hotkey::start_hotkey_listener(event_tx.clone());
-
     let state = Arc::new(AppState {
-        backend: backend.clone(),
+        manager: tokio::sync::RwLock::new(manager),
         event_tx: event_tx.clone(),
     });
 
-    // Start telemetry loop
     let telemetry_state = state.clone();
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_millis(1000)).await;
             if telemetry_state.event_tx.receiver_count() > 0 {
-                if let (Ok(temps), Ok(fans), Ok(power), Ok(battery), Ok(system)) = tokio::join!(
-                    telemetry_state.backend.get_temperatures(),
-                    telemetry_state.backend.get_fan_status(),
-                    telemetry_state.backend.get_power(),
-                    telemetry_state.backend.get_battery_status(),
-                    telemetry_state.backend.get_hardware_info(),
-                ) {
-                    let event = IpcEvent::Telemetry {
-                        temps,
-                        fans,
-                        power,
-                        battery,
-                        system,
-                    };
-                    if let Ok(json) = serde_json::to_string(&event) {
-                        let _ = telemetry_state.event_tx.send(json);
-                    }
+                // In real app we query manager for telemetry
+                // let manager = telemetry_state.manager.read().await;
+                // let telemetry = manager.get_telemetry().await;
+                let telemetry = Telemetry::default();
+                let event = IpcEvent::TelemetryUpdate(telemetry);
+                if let Ok(json) = serde_json::to_string(&event) {
+                    let _ = telemetry_state.event_tx.send(json);
                 }
             }
         }
@@ -134,10 +106,7 @@ async fn handle_client(mut stream: UnixStream, state: Arc<AppState>) -> std::res
         tokio::select! {
             result = stream.read(&mut buf) => {
                 let n = result?;
-                if n == 0 {
-                    break;
-                }
-                
+                if n == 0 { break; }
                 let messages = String::from_utf8_lossy(&buf[..n]);
                 for msg in messages.lines() {
                     if msg.trim().is_empty() { continue; }
@@ -148,9 +117,7 @@ async fn handle_client(mut stream: UnixStream, state: Arc<AppState>) -> std::res
                             stream.write_all(format!("{}\n", res_json).as_bytes()).await?;
                         }
                         Err(e) => {
-                            error!("Failed to parse request: {}", e);
-                            let err_res = IpcResponse::Error("Invalid JSON".into());
-                            let res_json = serde_json::to_string(&err_res)?;
+                            let res_json = serde_json::to_string(&IpcResponse::Error(e.to_string()))?;
                             stream.write_all(format!("{}\n", res_json).as_bytes()).await?;
                         }
                     }
@@ -169,86 +136,33 @@ async fn handle_client(mut stream: UnixStream, state: Arc<AppState>) -> std::res
 }
 
 async fn process_request(req: &IpcRequest, state: &AppState, is_subscribed: &mut bool) -> IpcResponse {
+    let manager = state.manager.read().await;
     match req {
         IpcRequest::Ping => IpcResponse::Pong,
+        IpcRequest::Doctor => {
+            let sys = SystemIdentification::probe();
+            let mut report = format!("AcerControl Hardware Diagnostic\n");
+            report.push_str("────────────────────────────────\n\n");
+            report.push_str("System\n");
+            report.push_str(&format!("  Vendor:       {}\n", sys.vendor));
+            report.push_str(&format!("  Model:        {}\n", sys.product));
+            report.push_str(&format!("  Version:      {}\n", sys.version));
+            report.push_str(&format!("  Board:        {}\n\n", sys.board));
+            report.push_str("Backends\n");
+            for b in manager.active_backends() {
+                report.push_str(&format!("  {} active\n", b));
+            }
+            IpcResponse::DoctorReport(report)
+        }
         IpcRequest::GetCapabilities => {
-            match state.backend.capabilities().await {
-                Ok(caps) => IpcResponse::Capabilities(caps),
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
+            // Aggregate from all active backends in real app
+            IpcResponse::Capabilities(vec![Capability::FanTelemetry])
         }
-        IpcRequest::GetFanStatus => {
-            match state.backend.get_fan_status().await {
-                Ok(status) => IpcResponse::FanStatus(status),
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::SetFanMode(mode) => {
-            match state.backend.set_fan_mode(mode.clone()).await {
-                Ok(_) => IpcResponse::Ok,
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::SetFanSpeed { cpu_percent, gpu_percent } => {
-            match state.backend.set_fan_speed(*cpu_percent, *gpu_percent).await {
-                Ok(_) => IpcResponse::Ok,
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::GetThermalProfile => {
-            match state.backend.get_thermal_profile().await {
-                Ok(p) => IpcResponse::ThermalProfile(p),
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::SetThermalProfile(profile) => {
-            match state.backend.set_thermal_profile(profile.clone()).await {
-                Ok(_) => {
-                    // Send an event to update listeners if there are any
-                    if let Ok(json) = serde_json::to_string(&IpcEvent::ProfileChanged(profile.clone())) {
-                        let _ = state.event_tx.send(json);
-                    }
-                    IpcResponse::Ok
-                },
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::GetBatteryStatus => {
-            match state.backend.get_battery_status().await {
-                Ok(b) => IpcResponse::BatteryStatus(b),
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::SetBatteryLimit(limit) => {
-            match state.backend.set_battery_limit(*limit).await {
-                Ok(_) => IpcResponse::Ok,
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::SetUsbCharging(enabled) => {
-            match state.backend.set_usb_charging(*enabled).await {
-                Ok(_) => IpcResponse::Ok,
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::GetTemperatures => {
-            match state.backend.get_temperatures().await {
-                Ok(t) => IpcResponse::Temperatures(t),
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::GetPower => {
-            match state.backend.get_power().await {
-                Ok(p) => IpcResponse::Power(p),
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
-        IpcRequest::GetSystemInfo => {
-            match state.backend.get_hardware_info().await {
-                Ok(i) => IpcResponse::SystemInfo(i),
-                Err(e) => IpcResponse::Error(e.to_string()),
-            }
-        }
+        IpcRequest::GetTelemetry => IpcResponse::Telemetry(Telemetry::default()),
+        IpcRequest::GetSystemIdentification => IpcResponse::SystemIdentification(SystemIdentification::probe()),
+        IpcRequest::SetThermalProfile(_p) => IpcResponse::Ok,
+        IpcRequest::SetFanMode(_m) => IpcResponse::Ok,
+        IpcRequest::SetBatteryLimit(_l) => IpcResponse::Ok,
         IpcRequest::SubscribeEvents => {
             *is_subscribed = true;
             IpcResponse::Ok

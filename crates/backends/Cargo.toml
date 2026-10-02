@@ -1,5 +1,5 @@
 [package]
-name = "acercontrol-hardware"
+name = "acercontrol-backends"
 version = "0.1.0"
 edition = "2024"
 

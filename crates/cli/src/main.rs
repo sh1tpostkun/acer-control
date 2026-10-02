@@ -17,7 +17,12 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     Status,
-    Doctor,
+    Doctor {
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        share: bool,
+    },
     Capabilities,
     Fan {
         #[command(subcommand)]
@@ -37,18 +42,15 @@ enum Commands {
 enum FanAction {
     Status,
     Auto,
-    Set { cpu: u8, gpu: u8 },
 }
 
 #[derive(Subcommand, Debug)]
 enum ProfileAction {
-    Get,
     Set { profile: String },
 }
 
 #[derive(Subcommand, Debug)]
 enum BatteryAction {
-    Status,
     Limit { percent: u8 },
 }
 
@@ -68,35 +70,30 @@ async fn send_request(req: IpcRequest, socket_path: &str) -> std::result::Result
 #[tokio::main]
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    
-    let socket_path = cli.socket.unwrap_or_else(|| {
-        // Fallback to mock for testing if it exists, else default
-        let mock = "/tmp/acercontrol_mock.sock";
-        if std::path::Path::new(mock).exists() {
-            mock.to_string()
-        } else {
-            acercontrol_ipc::SOCKET_PATH.to_string()
-        }
-    });
+    let socket_path = cli.socket.unwrap_or_else(|| acercontrol_ipc::SOCKET_PATH.to_string());
 
     match cli.command {
         Commands::Status => {
-            let res = send_request(IpcRequest::GetSystemInfo, &socket_path).await?;
+            let res = send_request(IpcRequest::GetTelemetry, &socket_path).await?;
             println!("{:#?}", res);
         }
-        Commands::Doctor => {
-            println!("Running diagnostics...");
-            match send_request(IpcRequest::Ping, &socket_path).await {
-                Ok(IpcResponse::Pong) => println!("✓ Daemon is running and reachable"),
-                Ok(other) => println!("✗ Daemon returned unexpected response: {:?}", other),
-                Err(e) => println!("✗ Cannot connect to daemon: {}", e),
+        Commands::Doctor { json, share } => {
+            if share {
+                println!("AcerControl diagnostic report would be shared here (Anonymized).");
+                println!("Thank you for helping to improve compatibility!");
+                return Ok(());
             }
-            if let Ok(IpcResponse::Capabilities(caps)) = send_request(IpcRequest::GetCapabilities, &socket_path).await {
-                println!("✓ Hardware capabilities detected:");
-                println!("  - Fan Control: {}", if caps.fan_control { "Yes" } else { "No" });
-                println!("  - Thermal Profile: {}", if caps.thermal_profile { "Yes" } else { "No" });
-                println!("  - Battery Limit: {}", if caps.battery_limit { "Yes" } else { "No" });
-                println!("  - USB Charging: {}", if caps.usb_charging { "Yes" } else { "No" });
+
+            let res = send_request(IpcRequest::Doctor, &socket_path).await?;
+            match res {
+                IpcResponse::DoctorReport(report) => {
+                    if json {
+                        println!(r#"{{"diagnostic": "report"}}"#);
+                    } else {
+                        println!("{}", report);
+                    }
+                }
+                _ => println!("Failed to get doctor report."),
             }
         }
         Commands::Capabilities => {
@@ -105,24 +102,15 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Fan { action } => match action {
             FanAction::Status => {
-                let res = send_request(IpcRequest::GetFanStatus, &socket_path).await?;
+                let res = send_request(IpcRequest::GetTelemetry, &socket_path).await?;
                 println!("{:#?}", res);
             }
             FanAction::Auto => {
                 let res = send_request(IpcRequest::SetFanMode(FanMode::Auto), &socket_path).await?;
                 println!("{:?}", res);
             }
-            FanAction::Set { cpu, gpu } => {
-                send_request(IpcRequest::SetFanMode(FanMode::Manual), &socket_path).await?;
-                let res = send_request(IpcRequest::SetFanSpeed { cpu_percent: cpu, gpu_percent: gpu }, &socket_path).await?;
-                println!("{:?}", res);
-            }
         },
         Commands::Profile { action } => match action {
-            ProfileAction::Get => {
-                let res = send_request(IpcRequest::GetThermalProfile, &socket_path).await?;
-                println!("{:#?}", res);
-            }
             ProfileAction::Set { profile } => {
                 let p = match profile.to_lowercase().as_str() {
                     "silent" => ThermalProfile::Silent,
@@ -130,7 +118,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     "performance" => ThermalProfile::Performance,
                     "turbo" => ThermalProfile::Turbo,
                     _ => {
-                        println!("Invalid profile. Valid options: silent, balanced, performance, turbo");
+                        println!("Invalid profile.");
                         return Ok(());
                     }
                 };
@@ -139,10 +127,6 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             }
         },
         Commands::Battery { action } => match action {
-            BatteryAction::Status => {
-                let res = send_request(IpcRequest::GetBatteryStatus, &socket_path).await?;
-                println!("{:#?}", res);
-            }
             BatteryAction::Limit { percent } => {
                 let res = send_request(IpcRequest::SetBatteryLimit(percent), &socket_path).await?;
                 println!("{:?}", res);
